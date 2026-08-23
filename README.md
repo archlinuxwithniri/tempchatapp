@@ -19,4 +19,4 @@ its should work in any OS
 the file update_github_status.py uses a token from my account which have permission to read and write to this repo 
 and when ever it runs and terminated it updates the link , you can edit the setup file to ignore the github update function and then run to run with out issue
 
-🟢 Currently Online — https://amenities-sellers-direct-maintaining.trycloudflare.com
+🟢 Currently Online — https://transcripts-petersburg-actress-stroke.trycloudflare.com
