@@ -15,46 +15,56 @@ from getpass import getpass
 import uuid
 
 # ----------------------------
+# 0️⃣ Ask whether to update GitHub
+# ----------------------------
+UPDATE_GITHUB = input("📡 Do you want to update URL in github ? (Y/N): ").strip().lower() == "y"
+
+# ----------------------------
 # 1️⃣ Download & decrypt .token.zip
 # ----------------------------
-ZIP_URL = "https://github.com/archlinuxwithniri/tempchatapp/raw/main/.token.zip"
-ZIP_PATH = "/content/.token.zip"
-TOKEN_TXT = "/content/token.txt"
+if UPDATE_GITHUB:
+    ZIP_URL = "https://github.com/archlinuxwithniri/tempchatapp/raw/main/.token.zip"
+    ZIP_PATH = "/content/.token.zip"
+    TOKEN_TXT = "/content/token.txt"
 
-print("⬇️ Downloading encrypted .token.zip ...")
-r = requests.get(ZIP_URL)
-if r.status_code != 200:
-    raise SystemExit(f"❌ Failed to download zip file: HTTP {r.status_code}")
-with open(ZIP_PATH, "wb") as f:
-    f.write(r.content)
-print("✅ Download complete.")
+    print("⬇️ Downloading encrypted .token.zip ...")
+    r = requests.get(ZIP_URL)
+    if r.status_code != 200:
+        raise SystemExit(f"❌ Failed to download zip file: HTTP {r.status_code}")
+    with open(ZIP_PATH, "wb") as f:
+        f.write(r.content)
+    print("✅ Download complete.")
 
-password = getpass("🔑 Enter password to decrypt .token.zip: ")
+    password = getpass("🔑 Enter password to decrypt .token.zip: ")
 
-def try_extract(zip_class, pwd):
-    try:
-        with zip_class(ZIP_PATH) as zf:
-            zf.pwd = pwd.encode('utf-8')
-            zf.extractall("/content")
-        return True
-    except Exception:
-        return False
+    def try_extract(zip_class, pwd):
+        try:
+            with zip_class(ZIP_PATH) as zf:
+                zf.pwd = pwd.encode('utf-8')
+                zf.extractall("/content")
+            return True
+        except Exception:
+            return False
 
-ok = try_extract(pyzipper.AESZipFile, password) or try_extract(pyzipper.ZipFile, password)
-if not ok:
-    raise SystemExit("❌ Wrong password or unsupported ZIP encryption format.")
+    ok = try_extract(pyzipper.AESZipFile, password) or try_extract(pyzipper.ZipFile, password)
+    if not ok:
+        raise SystemExit("❌ Wrong password or unsupported ZIP encryption format.")
 
-if not os.path.exists(TOKEN_TXT):
-    raise SystemExit("❌ token.txt not found after extraction!")
+    if not os.path.exists(TOKEN_TXT):
+        raise SystemExit("❌ token.txt not found after extraction!")
 
-with open(TOKEN_TXT, "r", encoding="utf-8") as f:
-    lines = [line.strip() for line in f.readlines() if line.strip()]
-    GITHUB_TOKEN = lines[0] if len(lines) > 0 else None
-    EMAIL = lines[1] if len(lines) > 1 else None
+    with open(TOKEN_TXT, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f.readlines() if line.strip()]
+        GITHUB_TOKEN = lines[0] if len(lines) > 0 else None
+        EMAIL = lines[1] if len(lines) > 1 else None
 
-os.remove(TOKEN_TXT)
-os.remove(ZIP_PATH)
-print("🔐 Token successfully loaded and ready to use!")
+    os.remove(TOKEN_TXT)
+    os.remove(ZIP_PATH)
+    print("🔐 Token successfully loaded and ready to use!")
+else:
+    GITHUB_TOKEN = None
+    EMAIL = None
+    print("⏭️ GitHub README updates disabled.")
 
 # ----------------------------
 # 2️⃣ Ensure dependencies installed
@@ -62,7 +72,7 @@ print("🔐 Token successfully loaded and ready to use!")
 def ensure_installed(pkgs):
     subprocess.run([os.sys.executable, "-m", "pip", "install", "-q"] + pkgs, check=True)
 
-ensure_installed(["flask", "requests", "cloudflared", "pyzipper"])
+ensure_installed(["flask", "requests", "pyzipper"])
 
 # Download cloudflared binary manually (since pip one is not the tunnel CLI)
 CLOUDFLARED_BIN = "/usr/local/bin/cloudflared"
@@ -89,15 +99,16 @@ os.makedirs(PHOTO_DIR, exist_ok=True)
 PORT = 8000
 
 # --- Download update script ---
-print("📥 Downloading update_github_status.py...")
-try:
-    r = requests.get(RAW_PY_URL, timeout=10)
-    r.raise_for_status()
-    with open(UPDATE_SCRIPT_PATH, "w", encoding="utf-8") as f:
-        f.write(r.text)
-    print("✅ update_github_status.py downloaded.")
-except Exception as e:
-    print("❌ Failed to download update script:", e)
+if UPDATE_GITHUB:
+    print("📥 Downloading update_github_status.py...")
+    try:
+        r = requests.get(RAW_PY_URL, timeout=10)
+        r.raise_for_status()
+        with open(UPDATE_SCRIPT_PATH, "w", encoding="utf-8") as f:
+            f.write(r.text)
+        print("✅ update_github_status.py downloaded.")
+    except Exception as e:
+        print("❌ Failed to download update script:", e)
 
 # --- Flask app setup ---
 app = Flask(__name__)
@@ -184,7 +195,7 @@ else:
     print(f"🌍 Public URL: {url}")
 
     # Mark online
-    if GITHUB_TOKEN:
+    if GITHUB_TOKEN and UPDATE_GITHUB:
         print("🔵 Updating README to Online...")
         subprocess.run([
             "python", UPDATE_SCRIPT_PATH,
@@ -192,7 +203,7 @@ else:
         ], check=False)
         print("✅ README updated: Online.")
     else:
-        print("⚠️ Missing token, skipping online update.")
+        print("⏭️ Skipping GitHub README update.")
 
 print("⏳ Tunnel active. Keep this running. Stop to end session.")
 
@@ -203,7 +214,7 @@ except KeyboardInterrupt:
     print("\n🟥 Interrupted by user.")
 finally:
     try:
-        if GITHUB_TOKEN:
+        if GITHUB_TOKEN and UPDATE_GITHUB:
             print("🔴 Updating README to Offline...")
             subprocess.run([
                 "python", UPDATE_SCRIPT_PATH,
